@@ -20,6 +20,9 @@ class Scout
         @win.box 'x', 'x'
         @win.setpos 2,2
         @win.addstr @position
+        @data = {}
+        @state = :prestart
+        @team = ''
     end
 
     def run
@@ -30,24 +33,71 @@ class Scout
             next unless event.value == 1
             # ignore numlock
             next if event.code == 69
-            @win.clear
-            @win.box 'x', 'x'
-            @win.setpos 2,2
-            @win.addstr @position
-            @win.setpos(2,12)
-            @win.addstr(event.code_str)
-            @win.setpos(4,12)
-            @win.addstr(event.code.to_s)
-            @win.refresh
+
+            case @state
+            when :prestart
+                case event.code_str
+                when /[0-9]/
+                    @team += event.code_str
+                when "Enter"
+                    @state = :auto
+                when "Backspace"
+                    @team = @team[0...-1]
+                end
+                draw_box_thing do
+                    @win.setpos(2,12)
+                    @win.addstr(event.code_str)
+                    @win.setpos(4,12)
+                    @win.addstr(event.code.to_s)
+                    @win.setpos(4,22)
+                    @win.addstr(@team)
+                end
+            when :auto
+                draw_box_thing do
+                    @data[event.code] ||= 0
+                    @data[event.code] += 1
+                    @win.setpos(2,12)
+                    @win.addstr(event.code_str)
+                    @win.setpos(4,12)
+                    @win.addstr(event.code.to_s)
+                    @win.setpos(4,22)
+                    @win.addstr(@data[event.code].to_s)
+                end
+
+            end
         end
         @win.clear
         @win.getch
     end
 
-    def safe
-       true 
+    def draw_box_thing
+        # do initial stuff with @win
+        @win.clear
+        @win.box 'x', 'x'
+        @win.setpos 2,2
+        @win.addstr @position
+        @win.setpos 3,2
+        @win.addstr(@team)
+        yield
+        # do closing stuff with @win
+        @win.refresh
     end
 
+    def safe
+        true 
+    end
+
+    def data
+        @data
+    end
+
+    def pos
+        @position
+    end
+    
+    def team
+        @team.to_i
+    end
 end
 
 
@@ -101,10 +151,16 @@ begin
         workers.each do |w|
             safe = false unless w.safe
         end
-    
+
         if safe
             close_screen
             pool.each(&:kill)
+
+            workers.each do |w|
+                print w.pos + ": "
+                puts "Team: " + w.team.inspect
+                puts w.data.inspect
+            end
 
             puts "Goodbye"
         else
