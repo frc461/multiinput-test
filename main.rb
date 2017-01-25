@@ -2,6 +2,8 @@
 
 require './libdevinput.rb'
 require 'curses'
+require 'json'
+require 'httparty'
 require 'yaml'
 
 raw_config = File.read('./config.yml')
@@ -62,9 +64,26 @@ class Scout
                     @win.addstr(event.code.to_s)
                     @win.setpos(4,22)
                     @win.addstr(@data[event.code].to_s)
+                    if event.code_str == "Enter"
+                        @state = :postmatch
+                    end
                 end
-
+            when :postmatch
+                draw_box_thing do
+                    @win.setpos(3, 12)
+                    @win.addstr("Saving data to server...")
+                end
+                uuid = JSON.parse(HTTParty.get('http://vps.boilerinvasion.org:5984/_uuids').body)['uuids'].first
+                response = JSON.parse(HTTParty.put('http://vps.boilerinvasion.org:5984/test/' + uuid, body: @data.to_json, headers: {Referer: 'vps.boilerinvasion.org'}).body)
+                draw_box_thing do
+                    @win.setpos(3, 12)
+                    @win.addstr("Data saved!")
+                    @win.setpos(4, 12)
+                    @win.addstr("Push any key to continue")
+                end
+                @state = :prestart
             end
+
         end
         @win.clear
         @win.getch
